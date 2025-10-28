@@ -44,21 +44,17 @@ Logger logger;
 // Базовый класс для объектов с уникальным ID
 class IdentifiableObject {
 protected:
-    static int nextId;
     int id;
     
 public:
-    IdentifiableObject() : id(nextId++) {}
-    IdentifiableObject(int specificId) : id(specificId) {
-        nextId = max(nextId, specificId + 1);
-    }
+    IdentifiableObject() : id(0) {}
+    IdentifiableObject(int specificId) : id(specificId) {}
     
     int getId() const { return id; }
+    void setId(int newId) { id = newId; }
     
     virtual ~IdentifiableObject() = default;
 };
-
-int IdentifiableObject::nextId = 1;
 
 // Общие функции для работы с вводом
 template<typename T>
@@ -99,33 +95,50 @@ bool getBoolInput(const string& prompt) {
 
 // Класс Труба
 class Pipe : public IdentifiableObject {
-public:
+private:
     string name;
     double length;
     int diameter;
     bool underRepair;
     
+public:
     Pipe() : length(0), diameter(0), underRepair(false) {}
-    Pipe(int specificId) : IdentifiableObject(specificId), length(0), diameter(0), underRepair(false) {}
     
-    void readFromConsole() {
+    // Конструктор копирования
+    Pipe(const Pipe& other) : IdentifiableObject(other.id), name(other.name), length(other.length), 
+                             diameter(other.diameter), underRepair(other.underRepair) {}
+    
+    // Оператор присваивания
+    Pipe& operator=(const Pipe& other) {
+        if (this != &other) {
+            id = other.id;
+            name = other.name;
+            length = other.length;
+            diameter = other.diameter;
+            underRepair = other.underRepair;
+        }
+        return *this;
+    }
+    
+    void readFromConsole(int newId) {
+        id = newId;
         name = getStringInput("Введите название трубы: ");
         length = getValidInput<double>("Введите длину трубы (км): ", 0.01);
         diameter = getValidInput<int>("Введите диаметр трубы (мм): ", 1);
         underRepair = getBoolInput("Труба в ремонте? (0 - нет, 1 - да): ");
         
-        logger.log("Создана труба: ID=" + to_string(id) + ", название='" + name + "'");
+        logger.log("Создана труба: ID=" + to_string(getId()) + ", название='" + name + "'");
     }
     
     void print() const {
-        cout << "Труба ID: " << id << "\n  Название: " << name 
+        cout << "Труба ID: " << getId() << "\n  Название: " << name 
              << "\n  Длина: " << length << " км\n  Диаметр: " << diameter << " мм"
              << "\n  В ремонте: " << (underRepair ? "да" : "нет") << "\n";
     }
     
     void toggleRepair() {
         underRepair = !underRepair;
-        logger.log("Труба ID=" + to_string(id) + " - статус ремонта изменен на: " + 
+        logger.log("Труба ID=" + to_string(getId()) + " - статус ремонта изменен на: " + 
                   (underRepair ? "в ремонте" : "работает"));
     }
     
@@ -136,31 +149,62 @@ public:
     bool matchesRepairFilter(bool inRepair) const {
         return underRepair == inRepair;
     }
+    
+    // Геттеры
+    string getName() const { return name; }
+    double getLength() const { return length; }
+    int getDiameter() const { return diameter; }
+    bool isUnderRepair() const { return underRepair; }
+    
+    // Сеттеры
+    void setName(const string& newName) { name = newName; }
+    void setLength(double newLength) { length = newLength; }
+    void setDiameter(int newDiameter) { diameter = newDiameter; }
+    void setUnderRepair(bool repair) { underRepair = repair; }
 };
 
 // Класс Компрессорная станция
 class CompressorStation : public IdentifiableObject {
-public:
+private:
     string name;
     int totalWorkshops;
     int workingWorkshops;
     string classification;
     
+public:
     CompressorStation() : totalWorkshops(0), workingWorkshops(0) {}
-    CompressorStation(int specificId) : IdentifiableObject(specificId), totalWorkshops(0), workingWorkshops(0) {}
     
-    void readFromConsole() {
+    // Конструктор копирования
+    CompressorStation(const CompressorStation& other) : IdentifiableObject(other.id), name(other.name), 
+                                                       totalWorkshops(other.totalWorkshops), 
+                                                       workingWorkshops(other.workingWorkshops), 
+                                                       classification(other.classification) {}
+    
+    // Оператор присваивания
+    CompressorStation& operator=(const CompressorStation& other) {
+        if (this != &other) {
+            id = other.id;
+            name = other.name;
+            totalWorkshops = other.totalWorkshops;
+            workingWorkshops = other.workingWorkshops;
+            classification = other.classification;
+        }
+        return *this;
+    }
+    
+    void readFromConsole(int newId) {
+        id = newId;
         name = getStringInput("Введите название компрессорной станции: ");
         totalWorkshops = getValidInput<int>("Введите общее количество цехов: ", 1);
         workingWorkshops = getValidInput<int>("Введите количество работающих цехов: ", 0, totalWorkshops);
         classification = getStringInput("Введите классификацию: ");
         
-        logger.log("Создана КС: ID=" + to_string(id) + ", название='" + name + 
+        logger.log("Создана КС: ID=" + to_string(getId()) + ", название='" + name + 
                   "', цехов: " + to_string(workingWorkshops) + "/" + to_string(totalWorkshops));
     }
     
     void print() const {
-        cout << "Компрессорная станция ID: " << id << "\n  Название: " << name 
+        cout << "Компрессорная станция ID: " << getId() << "\n  Название: " << name 
              << "\n  Цехи: " << workingWorkshops << "/" << totalWorkshops << " работают"
              << "\n  Незадействовано: " << getUnusedPercentage() << "%"
              << "\n  Классификация: " << classification << "\n";
@@ -169,7 +213,7 @@ public:
     bool startWorkshop() {
         if (workingWorkshops < totalWorkshops) {
             workingWorkshops++;
-            logger.log("КС ID=" + to_string(id) + " - запущен цех. Теперь " + 
+            logger.log("КС ID=" + to_string(getId()) + " - запущен цех. Теперь " + 
                       to_string(workingWorkshops) + "/" + to_string(totalWorkshops) + " работают");
             return true;
         }
@@ -179,7 +223,7 @@ public:
     bool stopWorkshop() {
         if (workingWorkshops > 0) {
             workingWorkshops--;
-            logger.log("КС ID=" + to_string(id) + " - остановлен цех. Теперь " + 
+            logger.log("КС ID=" + to_string(getId()) + " - остановлен цех. Теперь " + 
                       to_string(workingWorkshops) + "/" + to_string(totalWorkshops) + " работают");
             return true;
         }
@@ -197,6 +241,18 @@ public:
     bool matchesUnusedPercentageFilter(double minPercentage) const {
         return getUnusedPercentage() >= minPercentage;
     }
+    
+    // Геттеры
+    string getName() const { return name; }
+    int getTotalWorkshops() const { return totalWorkshops; }
+    int getWorkingWorkshops() const { return workingWorkshops; }
+    string getClassification() const { return classification; }
+    
+    // Сеттеры
+    void setName(const string& newName) { name = newName; }
+    void setTotalWorkshops(int count) { totalWorkshops = count; }
+    void setWorkingWorkshops(int count) { workingWorkshops = count; }
+    void setClassification(const string& newClassification) { classification = newClassification; }
 };
 
 // Базовый класс менеджера
@@ -204,8 +260,11 @@ template<typename T>
 class BaseManager {
 protected:
     map<int, T> objects;
+    int nextId;
     
 public:
+    BaseManager() : nextId(1) {}
+    
     virtual void addObject() = 0;
     
     void deleteObject(int id) {
@@ -258,6 +317,24 @@ public:
     const map<int, T>& getObjects() const {
         return objects;
     }
+    
+    int getNextId() {
+        return nextId;
+    }
+    
+    void updateNextId() {
+        if (objects.empty()) {
+            nextId = 1;
+        } else {
+            int maxId = 0;
+            for (const auto& entry : objects) {
+                if (entry.first > maxId) {
+                    maxId = entry.first;
+                }
+            }
+            nextId = maxId + 1;
+        }
+    }
 
 protected:
     template<typename Predicate>
@@ -277,12 +354,17 @@ class PipeManager : public BaseManager<Pipe> {
 public:
     void addObject() override {
         Pipe pipe;
-        pipe.readFromConsole();
-        objects[pipe.getId()] = pipe;
+        pipe.readFromConsole(nextId);
+        objects[nextId] = pipe;
+        nextId++;
+        cout << "Труба создана с ID: " << (nextId - 1) << "\n";
     }
     
     void addObject(const Pipe& pipe) {
         objects[pipe.getId()] = pipe;
+        if (pipe.getId() >= nextId) {
+            nextId = pipe.getId() + 1;
+        }
     }
     
     void editPipe(int id) {
@@ -309,6 +391,7 @@ public:
     
     void loadObjects(const map<int, Pipe>& newObjects) {
         objects = newObjects;
+        updateNextId();
     }
 };
 
@@ -317,12 +400,17 @@ class StationManager : public BaseManager<CompressorStation> {
 public:
     void addObject() override {
         CompressorStation station;
-        station.readFromConsole();
-        objects[station.getId()] = station;
+        station.readFromConsole(nextId);
+        objects[nextId] = station;
+        nextId++;
+        cout << "Компрессорная станция создана с ID: " << (nextId - 1) << "\n";
     }
     
     void addObject(const CompressorStation& station) {
         objects[station.getId()] = station;
+        if (station.getId() >= nextId) {
+            nextId = station.getId() + 1;
+        }
     }
     
     void editStationWorkshops(int id, int action) {
@@ -345,6 +433,7 @@ public:
     
     void loadObjects(const map<int, CompressorStation>& newObjects) {
         objects = newObjects;
+        updateNextId();
     }
 };
 
@@ -353,8 +442,8 @@ void savePipes(ofstream& file, const map<int, Pipe>& pipes) {
     file << "Pipes:" << pipes.size() << "\n";
     for (const auto& entry : pipes) {
         const Pipe& pipe = entry.second;
-        file << pipe.getId() << "\n" << pipe.name << "\n"
-             << pipe.length << "\n" << pipe.diameter << "\n" << pipe.underRepair << "\n";
+        file << pipe.getId() << "\n" << pipe.getName() << "\n"
+             << pipe.getLength() << "\n" << pipe.getDiameter() << "\n" << pipe.isUnderRepair() << "\n";
     }
 }
 
@@ -362,8 +451,8 @@ void saveStations(ofstream& file, const map<int, CompressorStation>& stations) {
     file << "Stations:" << stations.size() << "\n";
     for (const auto& entry : stations) {
         const CompressorStation& station = entry.second;
-        file << station.getId() << "\n" << station.name << "\n"
-             << station.totalWorkshops << "\n" << station.workingWorkshops << "\n" << station.classification << "\n";
+        file << station.getId() << "\n" << station.getName() << "\n"
+             << station.getTotalWorkshops() << "\n" << station.getWorkingWorkshops() << "\n" << station.getClassification() << "\n";
     }
 }
 
@@ -376,12 +465,13 @@ void loadPipes(ifstream& file, map<int, Pipe>& pipes) {
         for (int i = 0; i < count; i++) {
             getline(file, line);
             int id = stoi(line);
-            Pipe pipe(id);
+            Pipe pipe;
+            pipe.setId(id);
             
-            getline(file, pipe.name);
-            getline(file, line); pipe.length = stod(line);
-            getline(file, line); pipe.diameter = stoi(line);
-            getline(file, line); pipe.underRepair = stoi(line);
+            getline(file, line); pipe.setName(line);
+            getline(file, line); pipe.setLength(stod(line));
+            getline(file, line); pipe.setDiameter(stoi(line));
+            getline(file, line); pipe.setUnderRepair(stoi(line));
             
             pipes[id] = pipe;
         }
@@ -396,12 +486,13 @@ void loadStations(ifstream& file, map<int, CompressorStation>& stations) {
         for (int i = 0; i < count; i++) {
             getline(file, line);
             int id = stoi(line);
-            CompressorStation station(id);
+            CompressorStation station;
+            station.setId(id);
             
-            getline(file, station.name);
-            getline(file, line); station.totalWorkshops = stoi(line);
-            getline(file, line); station.workingWorkshops = stoi(line);
-            getline(file, station.classification);
+            getline(file, line); station.setName(line);
+            getline(file, line); station.setTotalWorkshops(stoi(line));
+            getline(file, line); station.setWorkingWorkshops(stoi(line));
+            getline(file, line); station.setClassification(line);
             
             stations[id] = station;
         }
